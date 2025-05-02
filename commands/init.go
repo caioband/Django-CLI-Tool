@@ -6,6 +6,7 @@ import (
     "fmt"
     "os"
     "strings"
+    "path/filepath"
 )
 
 type PushyConfig struct {
@@ -14,6 +15,57 @@ type PushyConfig struct {
     ArchiveName string   `json:"archive_name"`
     Exclude     []string `json:"exclude"`
     PostDeploy  []string `json:"post_deploy"`
+}
+
+func LoadEnvironmentConfig(name string) (*PushyConfig, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user home directory: %w", err)
+	}
+
+	path := filepath.Join(home, ".pushy", "environments", name+".json")
+
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open config file '%s': %w", path, err)
+	}
+	defer file.Close()
+
+	var cfg PushyConfig
+	decoder := json.NewDecoder(file)
+	if err := decoder.Decode(&cfg); err != nil {
+		return nil, fmt.Errorf("failed to decode config: %w", err)
+	}
+
+	return &cfg, nil
+}
+
+func SaveEnvironmentConfig(name string, cfg PushyConfig) error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("failed to get user home directory: %w", err)
+	}
+
+	dir := filepath.Join(home, ".pushy", "environments")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create config dir: %w", err)
+	}
+
+	configPath := filepath.Join(dir, name+".json")
+	file, err := os.Create(configPath)
+	if err != nil {
+		return fmt.Errorf("failed to create config file: %w", err)
+	}
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(cfg); err != nil {
+		return fmt.Errorf("failed to encode config: %w", err)
+	}
+
+	fmt.Printf("✅ Saved environment config to %s\n", configPath)
+	return nil
 }
 
 func RunInit() {
@@ -69,21 +121,10 @@ func RunInit() {
         PostDeploy:  postDeploy,
     }
 
-    file, err := os.Create("pushy.json")
-    if err != nil {
-        fmt.Println("❌ Failed to create pushy.json:", err)
+    if err := SaveEnvironmentConfig("default", config); err != nil {
+        fmt.Println("❌", err)
         return
     }
-    defer file.Close()
-
-    encoder := json.NewEncoder(file)
-    encoder.SetIndent("", "  ")
-    if err := encoder.Encode(config); err != nil {
-        fmt.Println("❌ Failed to write pushy.json:", err)
-        return
-    }
-
-    fmt.Println("✅ pushy.json file created successfully!")
 }
 
 func splitAndTrim(input string) []string {

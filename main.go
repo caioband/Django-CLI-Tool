@@ -20,7 +20,9 @@ func main() {
     case "config":
         commands.RunConfig(os.Args[2:])
     case "ssh":
-        commands.RunSSH()
+        commands.RunSSH(os.Args[2:])
+    case "show":
+        commands.RunShow(os.Args[2:])
     case "help", "--help", "-h":
         printHelp()
     default:

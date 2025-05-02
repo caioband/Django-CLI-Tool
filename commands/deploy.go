@@ -156,109 +156,119 @@ func createTarGz(filename string, exclude []string) error {
 }
 
 func RunDeploy(args []string) {
-    EnsureSCP()
+	env := "default"
+	if len(args) > 0 {
+		env = args[0]
+	}
 
-    userConfig, _ := loadUserConfig()
+	EnsureSCP()
 
-    configFile, err := os.Open("pushy.json")
-    if err != nil {
-        fmt.Println("❌ pushy.json file not found.")
-        return
-    }
-    defer configFile.Close()
+	// Load SSH key config
+	userConfig, _ := loadUserConfig()
 
-    var project PushyProjectConfig
-    decoder := json.NewDecoder(configFile)
-    if err := decoder.Decode(&project); err != nil {
-        fmt.Println("❌ Failed to read pushy.json:", err)
-        return
-    }
+	// Load environment config
+	project, err := LoadEnvironmentConfig(env)
+	if err != nil {
+		fmt.Println("❌ Failed to load environment config:", err)
+		return
+	}
 
-    if len(project.Exclude) == 0 {
-        project.Exclude = []string{
-            ".git",
-            "node_modules",
-            "venv",
-            "__pycache__",
-            ".idea",
-            ".vscode",
-            ".pushy",
-            "pushy.json",
-        }
-    }
+	if len(project.Exclude) == 0 {
+		project.Exclude = []string{
+			".git", "node_modules", "venv", "__pycache__",
+			".idea", ".vscode", ".pushy", "pushy.json",
+		}
+	}
 
-    archiveName := project.ArchiveName
-    if archiveName == "" {
-        archiveName = "pushy_deploy.tar.gz"
-    }
+	archiveName := project.ArchiveName
+	if archiveName == "" {
+		archiveName = "pushy_deploy.tar.gz"
+	}
 
-    fmt.Println("📦 Compressing project...")
-    if err := createTarGz(archiveName, project.Exclude); err != nil {
-        fmt.Println("❌ Failed to compress project:", err)
-        return
-    }
+	// Compress project
+	fmt.Println("📦 Compressing project...")
+	if err := createTarGz(archiveName, project.Exclude); err != nil {
+		fmt.Println("❌ Failed to compress project:", err)
+		return
+	}
 
-    var remoteDest string
-    if project.RemotePath == "" {
-        remoteDest = "~" // Home directory
-    } else {
-        remoteDest = fmt.Sprintf("~/%s", strings.TrimPrefix(project.RemotePath, "/"))
-    }
+	remotePath := project.RemotePath
+	if remotePath == "" {
+		remotePath = "."
+	}
 
-    // Create remote directory
-    if userConfig != nil && userConfig.SSHKeyPath != "" {
-        fmt.Println("📁 Ensuring remote directory exists:", remoteDest)
-        mkdirArgs := []string{"-i", userConfig.SSHKeyPath, project.Host, "mkdir", "-p", remoteDest}
-        mkdir := exec.Command("ssh", mkdirArgs...)
-        mkdir.Stdout = os.Stdout
-        mkdir.Stderr = os.Stderr
-        if err := mkdir.Run(); err != nil {
-            fmt.Println("❌ Failed to create remote directory:", err)
-            return
-        }
-    }
+	// Create remote dir if necessary
+	fmt.Println("📁 Ensuring remote directory exists:", remotePath)
+	sshArgs := []string{}
+	if userConfig != nil && userConfig.SSHKeyPath != "" {
+		sshArgs = append(sshArgs, "-i", userConfig.SSHKeyPath)
+	}
+	sshArgs = append(sshArgs, project.Host, fmt.Sprintf("mkdir -p %s", remotePath))
+	ssh := exec.Command("ssh", sshArgs...)
+	ssh.Stdout = os.Stdout
+	ssh.Stderr = os.Stderr
+	ssh.Stdin = os.Stdin
+	if err := ssh.Run(); err != nil {
+		fmt.Println("❌ Failed to create remote directory:", err)
+		return
+	}
 
-    // Build final scp command
-    scpArgs := []string{"-i", userConfig.SSHKeyPath, archiveName, fmt.Sprintf("%s:%s", project.Host, remoteDest)}
+	// Upload via SCP
+	fmt.Println("📤 Uploading to", project.Host)
+	scpArgs := []string{}
+	if userConfig != nil && userConfig.SSHKeyPath != "" {
+		scpArgs = append(scpArgs, "-i", userConfig.SSHKeyPath)
+	}
+	dest := fmt.Sprintf("%s:%s/", project.Host, strings.TrimSuffix(remotePath, "/"))
+	scpArgs = append(scpArgs, archiveName, dest)
 
-    fmt.Println("📤 Uploading to", project.Host)
-    scp := exec.Command("scp", scpArgs...)
-    scp.Stdout = os.Stdout
-    scp.Stderr = os.Stderr
-    scp.Stdin = os.Stdin
-    if err := scp.Run(); err != nil {
-        fmt.Println("❌ Failed to upload archive:", err)
-        return
-    }
+	scp := exec.Command("scp", scpArgs...)
+	scp.Stdout = os.Stdout
+	scp.Stderr = os.Stderr
+	scp.Stdin = os.Stdin
+	if err := scp.Run(); err != nil {
+		fmt.Println("❌ Upload failed:", err)
+		return
+	}
 
-    for i, cmd := range project.PostDeploy {
-        if strings.Contains(cmd, project.RemotePath) && project.RemotePath != "" {
-            project.PostDeploy[i] = strings.ReplaceAll(
-                cmd,
-                project.RemotePath,
-                remoteDest,
-            )
-        }
-    }
-    
+	// Build post-deploy command with automatic extraction
+	postCommands := project.PostDeploy
+	archiveCmd := fmt.Sprintf("tar -xzf %s", archiveName)
 
-    if len(project.PostDeploy) > 0 {
-        sshArgs := []string{}
-        if userConfig != nil && userConfig.SSHKeyPath != "" {
-            sshArgs = append(sshArgs, "-i", userConfig.SSHKeyPath)
-        }
-        sshArgs = append(sshArgs, project.Host, strings.Join(project.PostDeploy, " && "))
+	// Only inject tar command if user didn’t provide one
+	hasTar := false
+	for _, cmd := range postCommands {
+		if strings.Contains(cmd, "tar -xzf") {
+			hasTar = true
+			break
+		}
+	}
 
-        fmt.Println("🚀 Running post-deploy commands...")
-        ssh := exec.Command("ssh", sshArgs...)
-        ssh.Stdout = os.Stdout
-        ssh.Stderr = os.Stderr
-        ssh.Stdin = os.Stdin
-        if err := ssh.Run(); err != nil {
-            fmt.Println("❌ Post-deploy command failed:", err)
-        }
-    }
+	if !hasTar {
+		if remotePath != "." && remotePath != "" {
+			archiveCmd = fmt.Sprintf("cd %s && %s", remotePath, archiveCmd)
+		}
+		postCommands = append([]string{archiveCmd}, postCommands...)
+	}
 
-    _ = os.Remove(archiveName)
-    fmt.Println("✅ Deploy completed successfully!")
+	// Execute post-deploy
+	if len(postCommands) > 0 {
+		fmt.Println("🚀 Running post-deploy commands...")
+		sshArgs := []string{}
+		if userConfig != nil && userConfig.SSHKeyPath != "" {
+			sshArgs = append(sshArgs, "-i", userConfig.SSHKeyPath)
+		}
+		sshArgs = append(sshArgs, project.Host, strings.Join(postCommands, " && "))
+
+		ssh := exec.Command("ssh", sshArgs...)
+		ssh.Stdout = os.Stdout
+		ssh.Stderr = os.Stderr
+		ssh.Stdin = os.Stdin
+		if err := ssh.Run(); err != nil {
+			fmt.Println("❌ Post-deploy command failed:", err)
+		}
+	}
+
+	_ = os.Remove(archiveName)
+	fmt.Println("✅ Deploy completed successfully!")
 }
