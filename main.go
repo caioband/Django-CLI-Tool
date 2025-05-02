@@ -23,6 +23,8 @@ func main() {
         commands.RunSSH(os.Args[2:])
     case "show":
         commands.RunShow(os.Args[2:])
+    case "version", "--version", "-v":
+        commands.RunVersion()
     case "help", "--help", "-h":
         printHelp()
     default:
