@@ -232,11 +232,13 @@ func RunDeploy(args []string) {
     }
 
     for i, cmd := range project.PostDeploy {
-        project.PostDeploy[i] = strings.ReplaceAll(
-            cmd,
-            project.RemotePath,
-            fmt.Sprintf("~/%s", strings.TrimPrefix(project.RemotePath, "/")),
-        )
+        if strings.Contains(cmd, project.RemotePath) && project.RemotePath != "" {
+            project.PostDeploy[i] = strings.ReplaceAll(
+                cmd,
+                project.RemotePath,
+                remoteDest,
+            )
+        }
     }
     
 
