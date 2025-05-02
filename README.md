@@ -1,145 +1,125 @@
-# 🚀 pushy
+# Pushy
 
-**pushy** is a modern CLI tool written in Go to simplify project deployment via SSH.  
-It automates packaging, secure copy (`scp`), remote command execution, and configuration — making deployment effortless and consistent across environments.
-
----
+**Pushy** is a lightweight CLI tool to simplify project deployment via SSH.
 
 ## ✨ Features
 
-- 📦 Automatically compress the current project into `.tar.gz`
-- 🔐 Supports custom SSH key configuration
-- 📤 Deploy to remote servers using `scp`
-- 🧩 Execute post-deploy commands remotely via `ssh`
-- ⚙️ Interactive `init` command to generate configuration file
-- 🛠 `config` command to manage local settings
-- 💻 Cross-platform: Windows, Linux, macOS
+* Interactive configuration setup
+* Automatic SSH file transfers using `scp`
+* Automatic unpacking and optional post-deploy commands
+* Environment management via `~/.pushy/environments`
 
----
+## 🛠️ Requirements
 
-## 📥 Installation
+* Go 1.18 or higher
+* SSH access and private key
+* `scp` and `ssh` installed (Pushy can auto-install them on most systems)
 
-### 1. Clone the repository
+## 🔧 Installation
 
-```bash
-git clone https://github.com/your-username/pushy.git
-cd pushy
-```
-
-### 2. Build the binary
-
-#### 💻 Linux/macOS
+Install via Go:
 
 ```bash
-go build -o pushy
+go install github.com/caioband/pushy@latest
 ```
 
-#### 🪟 Windows
+## ⚡ Usage
+
+### 1. Set SSH Key Path
 
 ```bash
-go build -o pushy.exe
+pushy config ssh-key ~/.ssh/deploy_key
 ```
 
-To cross-compile:
-
-```bash
-GOOS=linux GOARCH=amd64 go build -o pushy-linux
-GOOS=windows GOARCH=amd64 go build -o pushy.exe
-```
-
----
-
-## ⚙️ Usage
-
-### 1. Configure your SSH key (optional but recommended)
-
-```bash
-pushy config ssh-key ~/.ssh/id_rsa
-```
-
-### 2. Initialize the project configuration file
+### 2. Initialize a New Environment
 
 ```bash
 pushy init
 ```
 
-### 3. Deploy your project
+This command will prompt for deployment settings and create a config file at:
+
+```
+~/.pushy/environments/default.json
+```
+
+### 3. Deploy the Project
 
 ```bash
 pushy deploy
 ```
 
----
+This will:
 
-## 🧪 Available Commands
+* Compress the current directory into a `.tar.gz`
+* Transfer the archive to the configured server
+* Optionally run post-deploy commands like `tar -xzf` or `cd` commands
+
+### 4. Connect via SSH
 
 ```bash
-pushy init                     # Generate pushy.json interactively
-pushy deploy                   # Compress, send and run remote post-deploy commands
-pushy config ssh-key <path>    # Set SSH private key path
-pushy ssh                      # Open direct SSH session using saved config
+pushy ssh
 ```
 
----
+Connects to the remote server using your saved SSH key and hostname.
 
-## 📁 Example pushy.json
+### 5. Check Current Configuration
+
+```bash
+pushy show <enviroment>
+```
+
+Displays the active deployment settings stored in your environment.
+
+### 6. Check Version
+
+```bash
+pushy version
+```
+
+Shows the installed Pushy version.
+
+## 💡 Example
+
+```bash
+pushy config ssh-key ~/.ssh/deploy_key
+pushy init
+pushy deploy
+```
+
+## 📂 Configuration File Format
 
 ```json
 {
-  "host": "user@your-server.com",
-  "remote_path": "/var/www/myapp",
-  "archive_name": "pushy_deploy.tar.gz",
-  "exclude": [".git", "node_modules", "pushy.json"],
+  "host": "user@yourserver.com",
+  "remote_path": "pushy",
+  "archive_name": "project.tar.gz",
+  "exclude": [".git", "node_modules", "venv", "__pycache__"],
   "post_deploy": [
-    "cd /var/www/myapp",
-    "tar -xzf pushy_deploy.tar.gz",
-    "rm pushy_deploy.tar.gz"
+    "tar -xzf project.tar.gz",
+    "cd project"
   ]
 }
 ```
 
----
-
-## 🔐 Security
-
-- The SSH key path is stored in `~/.pushy/config.json`
-- Ensure your private key has restricted permissions:
-
-```bash
-chmod 400 ~/.ssh/your-key.pem
-```
-
-
----
-
-## 📦 Requirements
-
-- Go 1.18+ installed and available in your system's PATH
-- Access to a remote server with:
-  - OpenSSH server running (port 22 by default)
-  - Writable access to the specified remote_path
-- (Optional) SSH key properly configured and whitelisted on the server
-- SCP (secure copy) installed locally (automatically suggested if missing)
-
-
----
-
-## 📄 License
-
-This project is licensed under the **MIT License**.  
-Feel free to use, modify, and contribute.
-
----
-
 ## 🤝 Contributing
 
-Contributions are welcome!  
-Open a [pull request](https://github.com/your-username/pushy/pulls) or [issue](https://github.com/your-username/pushy/issues) to collaborate.
+We welcome contributions to Pushy!
 
----
+To contribute:
 
-## ✉️ Contact
+1. Fork the repository
+2. Create a new branch for your feature or bugfix
+3. Make your changes and commit them
+4. Open a pull request with a clear description
 
-Made with 💻 by **Your Name**  
-📧 Email: you@example.com  
-🌐 GitHub: [https://github.com/your-username](https://github.com/your-username)
+Please ensure your changes are consistent with the style of the project and include tests or usage examples when applicable.
+
+## ✉ License
+
+This project is licensed under the MIT License.
+
+## 📬 Contact
+
+* Email: [caioobsantos@gmail.com](mailto:caioobsantos@gmail.com)
+* GitHub: [github.com/caioband](https://github.com/caioband)
