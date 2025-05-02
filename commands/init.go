@@ -19,36 +19,37 @@ type PushyConfig struct {
 func RunInit() {
     reader := bufio.NewReader(os.Stdin)
 
-    fmt.Print("🔒 Host remoto (ex: root@192.168.0.10): ")
+    fmt.Print("🔒 Remote host (e.g., root@192.168.0.10): ")
     host, _ := reader.ReadString('\n')
 
-    fmt.Print("📂 Caminho remoto de destino (ex: /var/www/app): ")
-    remotePath, _ := reader.ReadString('\n')
+    fmt.Print("📂 Remote path (e.g., /var/www/app) [default: ~/]: ")
+	remotePath, _ := reader.ReadString('\n')
+	remotePath = strings.TrimSpace(remotePath)
 
-    fmt.Print("📦 Nome do arquivo .tar.gz (padrão: pushy_deploy.tar.gz): ")
+    fmt.Print("📦 Archive name (.tar.gz) [default: pushy_deploy.tar.gz]: ")
     archiveName, _ := reader.ReadString('\n')
     if strings.TrimSpace(archiveName) == "" {
         archiveName = "pushy_deploy.tar.gz\n"
     }
 
-    fmt.Print("🚫 Pastas/arquivos para ignorar (separados por vírgula): ")
+    fmt.Print("🚫 Files/folders to exclude (comma-separated): ")
     excludeInput, _ := reader.ReadString('\n')
     excludeList := splitAndTrim(excludeInput)
-	
-	if len(excludeList) == 0 {
-		excludeList = []string{
-			".git",
-			"node_modules",
-			"venv",
-			"__pycache__",
-			".idea",
-			".vscode",
-			".pushy",
-			"pushy.json",
-		}
-	}
 
-    fmt.Println("🧩 Comandos pós-deploy (digite 1 por linha, ENTER vazio para finalizar):")
+    if len(excludeList) == 0 {
+        excludeList = []string{
+            ".git",
+            "node_modules",
+            "venv",
+            "__pycache__",
+            ".idea",
+            ".vscode",
+            ".pushy",
+            "pushy.json",
+        }
+    }
+
+    fmt.Println("🧩 Post-deploy commands (one per line, empty line to finish):")
     postDeploy := []string{}
     for {
         fmt.Print("> ")
@@ -70,7 +71,7 @@ func RunInit() {
 
     file, err := os.Create("pushy.json")
     if err != nil {
-        fmt.Println("❌ Erro ao criar pushy.json:", err)
+        fmt.Println("❌ Failed to create pushy.json:", err)
         return
     }
     defer file.Close()
@@ -78,11 +79,11 @@ func RunInit() {
     encoder := json.NewEncoder(file)
     encoder.SetIndent("", "  ")
     if err := encoder.Encode(config); err != nil {
-        fmt.Println("❌ Erro ao escrever pushy.json:", err)
+        fmt.Println("❌ Failed to write pushy.json:", err)
         return
     }
 
-    fmt.Println("✅ Arquivo pushy.json criado com sucesso!")
+    fmt.Println("✅ pushy.json file created successfully!")
 }
 
 func splitAndTrim(input string) []string {

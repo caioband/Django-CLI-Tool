@@ -22,12 +22,12 @@ type PushyProjectConfig struct {
     PostDeploy  []string `json:"post_deploy"`
 }
 
-func exibirInstrucoes() {
+func showInstallInstructions() {
     switch runtime.GOOS {
     case "windows":
         fmt.Println("🔹 Windows:")
-        fmt.Println("- Ative o OpenSSH Client nas Configurações do Windows")
-        fmt.Println("- Ou use: winget install OpenSSH.Client")
+        fmt.Println("- Enable OpenSSH Client in Windows Features")
+        fmt.Println("- Or use: winget install OpenSSH.Client")
     case "linux":
         fmt.Println("🔹 Linux:")
         fmt.Println("- sudo apt install openssh-client")
@@ -40,22 +40,22 @@ func exibirInstrucoes() {
 func EnsureSCP() {
     _, err := exec.LookPath("scp")
     if err == nil {
-        return // scp está disponível
+        return
     }
 
-    fmt.Println("❌ 'scp' não foi encontrado no sistema.")
+    fmt.Println("❌ 'scp' was not found on your system.")
     reader := bufio.NewReader(os.Stdin)
-    fmt.Print("Deseja que o pushy tente instalar automaticamente? [s/N]: ")
-    resposta, _ := reader.ReadString('\n')
-    resposta = strings.ToLower(strings.TrimSpace(resposta))
+    fmt.Print("Would you like pushy to try installing it automatically? [y/N]: ")
+    answer, _ := reader.ReadString('\n')
+    answer = strings.ToLower(strings.TrimSpace(answer))
 
-    if resposta != "s" && resposta != "sim" {
-        fmt.Println("ℹ️  Instale o 'scp' manualmente e tente novamente.")
-        exibirInstrucoes()
+    if answer != "y" && answer != "yes" {
+        fmt.Println("ℹ️ Please install 'scp' manually and try again.")
+        showInstallInstructions()
         os.Exit(1)
     }
 
-    fmt.Println("🛠️ Tentando instalar 'scp'...")
+    fmt.Println("🛠️ Attempting to install 'scp'...")
 
     var cmd *exec.Cmd
 
@@ -67,7 +67,7 @@ func EnsureSCP() {
     case "darwin":
         cmd = exec.Command("brew", "install", "openssh")
     default:
-        fmt.Println("⚠️ Sistema não suportado para instalação automática.")
+        fmt.Println("⚠️ Unsupported operating system for automatic installation.")
         os.Exit(1)
     }
 
@@ -76,32 +76,31 @@ func EnsureSCP() {
     cmd.Stdin = os.Stdin
 
     if err := cmd.Run(); err != nil {
-        fmt.Println("❌ Falha ao instalar 'scp':", err)
+        fmt.Println("❌ Failed to install 'scp':", err)
         os.Exit(1)
     }
 
-    fmt.Println("✅ 'scp' instalado com sucesso. Continue com o deploy.")
+    fmt.Println("✅ 'scp' installed successfully. Proceeding with deploy.")
 }
-
 
 func loadUserConfig() (*PushyUserConfig, error) {
     homeDir, err := os.UserHomeDir()
     if err != nil {
-        return nil, fmt.Errorf("erro ao obter diretório do usuário: %w", err)
+        return nil, fmt.Errorf("failed to get user home directory: %w", err)
     }
 
     configPath := filepath.Join(homeDir, ".pushy", "config.json")
 
     file, err := os.Open(configPath)
     if err != nil {
-        return nil, fmt.Errorf("não foi possível abrir ~/.pushy/config.json: %w", err)
+        return nil, fmt.Errorf("could not open ~/.pushy/config.json: %w", err)
     }
     defer file.Close()
 
     var config PushyUserConfig
     decoder := json.NewDecoder(file)
     if err := decoder.Decode(&config); err != nil {
-        return nil, fmt.Errorf("erro ao decodificar config.json: %w", err)
+        return nil, fmt.Errorf("failed to parse config.json: %w", err)
     }
 
     return &config, nil
@@ -125,7 +124,6 @@ func createTarGz(filename string, exclude []string) error {
             return err
         }
 
-        // Ignora arquivos da lista
         for _, ex := range exclude {
             if strings.Contains(path, ex) {
                 return nil
@@ -160,13 +158,11 @@ func createTarGz(filename string, exclude []string) error {
 func RunDeploy(args []string) {
     EnsureSCP()
 
-    // Carrega config global do usuário
     userConfig, _ := loadUserConfig()
 
-    // Lê pushy.json
     configFile, err := os.Open("pushy.json")
     if err != nil {
-        fmt.Println("❌ Arquivo pushy.json não encontrado.")
+        fmt.Println("❌ pushy.json file not found.")
         return
     }
     defer configFile.Close()
@@ -174,7 +170,7 @@ func RunDeploy(args []string) {
     var project PushyProjectConfig
     decoder := json.NewDecoder(configFile)
     if err := decoder.Decode(&project); err != nil {
-        fmt.Println("❌ Erro ao ler pushy.json:", err)
+        fmt.Println("❌ Failed to read pushy.json:", err)
         return
     }
 
@@ -196,31 +192,54 @@ func RunDeploy(args []string) {
         archiveName = "pushy_deploy.tar.gz"
     }
 
-    // Cria .tar.gz excluindo arquivos/pastas definidos
-    fmt.Println("📦 Compactando projeto...")
+    fmt.Println("📦 Compressing project...")
     if err := createTarGz(archiveName, project.Exclude); err != nil {
-        fmt.Println("❌ Erro ao compactar:", err)
+        fmt.Println("❌ Failed to compress project:", err)
         return
     }
 
-    // Monta comando SCP
-    scpArgs := []string{}
-    if userConfig != nil && userConfig.SSHKeyPath != "" {
-        scpArgs = append(scpArgs, "-i", userConfig.SSHKeyPath)
+    var remoteDest string
+    if project.RemotePath == "" {
+        remoteDest = "~" // Home directory
+    } else {
+        remoteDest = fmt.Sprintf("~/%s", strings.TrimPrefix(project.RemotePath, "/"))
     }
-    scpArgs = append(scpArgs, archiveName, fmt.Sprintf("%s:%s", project.Host, project.RemotePath))
 
-    fmt.Println("📤 Enviando para", project.Host)
+    // Create remote directory
+    if userConfig != nil && userConfig.SSHKeyPath != "" {
+        fmt.Println("📁 Ensuring remote directory exists:", remoteDest)
+        mkdirArgs := []string{"-i", userConfig.SSHKeyPath, project.Host, "mkdir", "-p", remoteDest}
+        mkdir := exec.Command("ssh", mkdirArgs...)
+        mkdir.Stdout = os.Stdout
+        mkdir.Stderr = os.Stderr
+        if err := mkdir.Run(); err != nil {
+            fmt.Println("❌ Failed to create remote directory:", err)
+            return
+        }
+    }
+
+    // Build final scp command
+    scpArgs := []string{"-i", userConfig.SSHKeyPath, archiveName, fmt.Sprintf("%s:%s", project.Host, remoteDest)}
+
+    fmt.Println("📤 Uploading to", project.Host)
     scp := exec.Command("scp", scpArgs...)
     scp.Stdout = os.Stdout
     scp.Stderr = os.Stderr
     scp.Stdin = os.Stdin
     if err := scp.Run(); err != nil {
-        fmt.Println("❌ Erro ao enviar:", err)
+        fmt.Println("❌ Failed to upload archive:", err)
         return
     }
 
-    // Executa post-deploy via SSH
+    for i, cmd := range project.PostDeploy {
+        project.PostDeploy[i] = strings.ReplaceAll(
+            cmd,
+            project.RemotePath,
+            fmt.Sprintf("~/%s", strings.TrimPrefix(project.RemotePath, "/")),
+        )
+    }
+    
+
     if len(project.PostDeploy) > 0 {
         sshArgs := []string{}
         if userConfig != nil && userConfig.SSHKeyPath != "" {
@@ -228,17 +247,16 @@ func RunDeploy(args []string) {
         }
         sshArgs = append(sshArgs, project.Host, strings.Join(project.PostDeploy, " && "))
 
-        fmt.Println("🚀 Executando comandos pós-deploy...")
+        fmt.Println("🚀 Running post-deploy commands...")
         ssh := exec.Command("ssh", sshArgs...)
         ssh.Stdout = os.Stdout
         ssh.Stderr = os.Stderr
         ssh.Stdin = os.Stdin
         if err := ssh.Run(); err != nil {
-            fmt.Println("❌ Erro no pós-deploy:", err)
+            fmt.Println("❌ Post-deploy command failed:", err)
         }
     }
 
-    // Remove arquivo local
     _ = os.Remove(archiveName)
-    fmt.Println("✅ Deploy finalizado com sucesso!")
+    fmt.Println("✅ Deploy completed successfully!")
 }

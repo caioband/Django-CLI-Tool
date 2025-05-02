@@ -13,7 +13,7 @@ type PushyUserConfig struct {
 
 func RunConfig(args []string) {
     if len(args) < 2 {
-        fmt.Println("Uso: pushy config ssh-key <caminho/da/chave>")
+        fmt.Println("Usage: pushy config ssh-key <path/to/key>")
         return
     }
 
@@ -21,10 +21,10 @@ func RunConfig(args []string) {
 
     switch subcommand {
     case "ssh-key":
-        caminho := args[1]
-        setSSHKey(caminho)
+        path := args[1]
+        setSSHKey(path)
     default:
-        fmt.Println("Configuração não reconhecida:", subcommand)
+        fmt.Println("Unrecognized config command:", subcommand)
     }
 }
 
@@ -35,24 +35,24 @@ func setSSHKey(path string) {
 
     homeDir, err := os.UserHomeDir()
     if err != nil {
-        fmt.Println("Erro ao obter diretório do usuário:", err)
+        fmt.Println("Failed to get user home directory:", err)
         return
     }
 
     pushyDir := filepath.Join(homeDir, ".pushy")
     configPath := filepath.Join(pushyDir, "config.json")
 
-    // Cria o diretório ~/.pushy se não existir
+    // Create ~/.pushy if it doesn't exist
     if _, err := os.Stat(pushyDir); os.IsNotExist(err) {
         if err := os.Mkdir(pushyDir, 0755); err != nil {
-            fmt.Println("Erro ao criar ~/.pushy:", err)
+            fmt.Println("Failed to create ~/.pushy directory:", err)
             return
         }
     }
 
     file, err := os.Create(configPath)
     if err != nil {
-        fmt.Println("Erro ao criar config.json:", err)
+        fmt.Println("Failed to create config.json:", err)
         return
     }
     defer file.Close()
@@ -60,9 +60,9 @@ func setSSHKey(path string) {
     encoder := json.NewEncoder(file)
     encoder.SetIndent("", "  ")
     if err := encoder.Encode(config); err != nil {
-        fmt.Println("Erro ao escrever config.json:", err)
+        fmt.Println("Failed to write to config.json:", err)
         return
     }
 
-    fmt.Println("✅ Caminho da chave SSH salvo em ~/.pushy/config.json")
+    fmt.Println("✅ SSH key path saved to ~/.pushy/config.json")
 }

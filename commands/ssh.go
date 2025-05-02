@@ -8,12 +8,11 @@ import (
     "path/filepath"
 )
 
-
 func RunSSH() {
-    // Lê pushy.json
+    // Load pushy.json
     file, err := os.Open("pushy.json")
     if err != nil {
-        fmt.Println("❌ Arquivo pushy.json não encontrado.")
+        fmt.Println("❌ pushy.json file not found.")
         return
     }
     defer file.Close()
@@ -21,32 +20,32 @@ func RunSSH() {
     var project PushyProjectConfig
     decoder := json.NewDecoder(file)
     if err := decoder.Decode(&project); err != nil {
-        fmt.Println("❌ Erro ao ler pushy.json:", err)
+        fmt.Println("❌ Failed to read pushy.json:", err)
         return
     }
 
     if project.Host == "" {
-        fmt.Println("❌ Host não especificado em pushy.json")
+        fmt.Println("❌ Host not specified in pushy.json.")
         return
     }
 
-    // Lê config do usuário
+    // Load user's SSH key config
     userConfig, err := loadUserConfig()
     if err != nil || userConfig.SSHKeyPath == "" {
-        fmt.Println("❌ Caminho da chave SSH não configurado.")
-        fmt.Println("Use: pushy config ssh-key <caminho>")
+        fmt.Println("❌ SSH key path not configured.")
+        fmt.Println("Use: pushy config ssh-key <path>")
         return
     }
 
-    // Executa ssh
+    // Build and execute ssh command
     args := []string{"-i", filepath.Clean(userConfig.SSHKeyPath), project.Host}
     cmd := exec.Command("ssh", args...)
     cmd.Stdout = os.Stdout
     cmd.Stderr = os.Stderr
     cmd.Stdin = os.Stdin
 
-    fmt.Println("🔐 Conectando com:", project.Host)
+    fmt.Println("🔐 Connecting to:", project.Host)
     if err := cmd.Run(); err != nil {
-        fmt.Println("❌ Erro ao conectar via SSH:", err)
+        fmt.Println("❌ Failed to connect via SSH:", err)
     }
 }

@@ -24,22 +24,23 @@ func main() {
     case "help", "--help", "-h":
         printHelp()
     default:
-        fmt.Println("❌ Comando inválido:", os.Args[1])
+        fmt.Println("❌ Invalid command:", os.Args[1])
         printHelp()
     }
 }
 
 func printHelp() {
-fmt.Print(`
-🔧 pushy - Facilitador de Deploys via SSH
+    fmt.Print(`
+🔧 pushy - Lightweight SSH deployment tool
 
-Comandos disponíveis:
+Available commands:
 
-  pushy init               Inicia o pushy.json com perguntas interativas
-  pushy deploy             Envia o projeto para o servidor remoto via scp
-  pushy config ssh-key     Define o caminho da chave SSH (salva em ~/.pushy)
+  pushy init               Generate pushy.json via interactive prompts
+  pushy deploy             Compress, send, and deploy project to remote server
+  pushy config ssh-key     Set SSH private key path (stored in ~/.pushy)
+  pushy ssh                Connect directly via SSH using saved config
 
-Exemplo:
+Example:
 
   pushy config ssh-key ~/.ssh/deploy_key
   pushy init
