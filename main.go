@@ -34,20 +34,26 @@ func main() {
 }
 
 func printHelp() {
-    fmt.Print(`
-🔧 pushy - Lightweight SSH deployment tool
+	fmt.Print(`
+🚀 pushy - Lightweight CLI for automated SSH-based deployments
+
+Usage:
+  pushy <command> [arguments]
 
 Available commands:
+  init                  Create a new environment configuration (default.json)
+  deploy [env]          Deploy the current directory using the specified environment
+  config ssh-key <path> Set the SSH private key path used for all deployments
+  ssh [env]             Open an SSH session with the environment's host
+  show [env]            Display the config of a given environment (default is "default")
+  version               Show the current version of pushy
+  help                  Show this help message
 
-  pushy init               Generate pushy.json via interactive prompts
-  pushy deploy             Compress, send, and deploy project to remote server
-  pushy config ssh-key     Set SSH private key path (stored in ~/.pushy)
-  pushy ssh                Connect directly via SSH using saved config
-
-Example:
-
-  pushy config ssh-key ~/.ssh/deploy_key
+Examples:
   pushy init
-  pushy deploy
+  pushy config ssh-key ~/.ssh/id_rsa
+  pushy deploy production
+  pushy ssh
+  pushy show staging
 `)
 }
