@@ -3,7 +3,7 @@ package main
 import (
     "fmt"
     "os"
-    "pushy/commands"
+    "github.com/caioband/pushy/commands"
 )
 
 func main() {
